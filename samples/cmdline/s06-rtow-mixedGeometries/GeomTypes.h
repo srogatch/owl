@@ -100,6 +100,7 @@ namespace owl {
   // ==================================================================
   struct RayGenData
   {
+    uint32_t** ptrs;
     uint32_t *fbPtr;
     vec2i  fbSize;
     OptixTraversableHandle world;

@@ -158,13 +158,6 @@ OPTIX_CLOSEST_HIT_PROGRAM(DielectricSpheres)()
 { closestHit<DielectricSpheresGeom>(); }
 
 
-
-
-
-
-
-
-
 // ==================================================================
 // miss and raygen
 // ==================================================================
@@ -185,7 +178,6 @@ OPTIX_MISS_PROGRAM(miss)()
   PerRayData &prd = owl::getPRD<PerRayData>();
   prd.out.scatterEvent = rayDidntHitAnything;
 }
-
 
 
 inline __device__

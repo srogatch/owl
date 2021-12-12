@@ -266,7 +266,8 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
   const RayGenData &self = owl::getProgramData<RayGenData>();
   const vec2i pixelID = owl::getLaunchIndex();
   
-  const int pixelIdx = pixelID.x+self.fbSize.x*(self.fbSize.y-1-pixelID.y);
+  //const int pixelIdx = pixelID.x+self.fbSize.x*(self.fbSize.y-1-pixelID.y);
+  const int pixelIdx = pixelID.x+self.fbSize.x*pixelID.y;
 
   PerRayData prd;
   prd.random.init(pixelID.x,pixelID.y);
@@ -292,9 +293,13 @@ OPTIX_RAYGEN_PROGRAM(rayGen)()
 
     color += tracePath(self, ray, prd);
   }
-    
-  self.fbPtr[pixelIdx]
-    = owl::make_rgba(color * (1.f / NUM_SAMPLES_PER_PIXEL));
+
+  const uint32_t rgba = owl::make_rgba(color * (1.f / NUM_SAMPLES_PER_PIXEL));
+  self.fbPtr[pixelIdx] = rgba;
+  uint32_t* p = static_cast<uint32_t*>(malloc(sizeof(rgba) * 1));
+  *p = rgba;
+  self.ptrs[pixelIdx] = p;
+  if(pixelIdx < 4) {
+    printf(" %d %p ", int(pixelIdx), p);
+  }
 }
-
-

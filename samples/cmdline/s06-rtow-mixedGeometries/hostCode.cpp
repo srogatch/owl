@@ -27,6 +27,7 @@
 #include "stb/stb_image_write.h"
 
 #include <random>
+#include <cuda_runtime.h>
 
 #define LOG(message)                                            \
   std::cout << OWL_TERMINAL_BLUE;                               \
@@ -36,6 +37,14 @@
   std::cout << OWL_TERMINAL_LIGHT_BLUE;                         \
   std::cout << "#owl.sample(main): " << message << std::endl;    \
   std::cout << OWL_TERMINAL_DEFAULT;
+
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
+   if (code != cudaSuccess) {
+      fprintf(stderr,"GPU error %d: %s . %s:%d\n", int(code), cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
 
 extern "C" char deviceCode_ptx[];
 
@@ -500,6 +509,7 @@ int main(int ac, char **av)
   // set up ray gen program
   // -------------------------------------------------------
   OWLVarDecl rayGenVars[] = {
+    { "ptrs",          OWL_BUFPTR, OWL_OFFSETOF(RayGenData, ptrs)},
     { "fbPtr",         OWL_BUFPTR, OWL_OFFSETOF(RayGenData,fbPtr)},
     { "fbSize",        OWL_INT2,   OWL_OFFSETOF(RayGenData,fbSize)},
     { "world",         OWL_GROUP,  OWL_OFFSETOF(RayGenData,world)},
@@ -535,8 +545,10 @@ int main(int ac, char **av)
 
   OWLBuffer frameBuffer
     = owlHostPinnedBufferCreate(context,OWL_INT,fbSize.x*fbSize.y);
+  OWLBuffer ptrsBuffer = owlHostPinnedBufferCreate(context, OWL_RAW_POINTER, fbSize.x*fbSize.y);
 
   // ----------- set variables  ----------------------------
+  owlRayGenSetBuffer(rayGen,"ptrs",         ptrsBuffer);
   owlRayGenSetBuffer(rayGen,"fbPtr",        frameBuffer);
   owlRayGenSet2i    (rayGen,"fbSize",       (const owl2i&)fbSize);
   owlRayGenSetGroup (rayGen,"world",        world);
@@ -569,6 +581,21 @@ int main(int ac, char **av)
   stbi_write_png(outFileName,fbSize.x,fbSize.y,4,
                  fb,fbSize.x*sizeof(uint32_t));
   LOG_OK("written rendered frame buffer to file "<<outFileName);
+
+  const uint32_t * const * ptrs = static_cast<const uint32_t * const *>(
+    owlBufferGetPointer(ptrsBuffer, 0));
+  for(int i=0; i<4; i++) {
+    printf(" %d %p ", i, ptrs[i]);
+  }
+
+  for(int i=0; i<fbSize.x*fbSize.y; i++) {
+    uint32_t rgba;
+    gpuErrchk(cudaMemcpy(&rgba, ptrs[i], sizeof(rgba), cudaMemcpyDeviceToHost));
+    if(rgba != fb[i]) {
+      printf("x");
+    }
+  }
+  std::cout << std::endl;
 
   // ##################################################################
   // and finally, clean up
